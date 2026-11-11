@@ -3,9 +3,10 @@
 
     python3 tools/verify_text.py
 
-Every latex/**/*.tex file names its source file in its first line.  The LaTeX markup is
+Every latex/*/*.tex file names its source file in its first line.  The LaTeX markup is
 stripped again and the remaining characters are compared, in order, with the characters
-of the .txt file.  Only two things are allowed to differ:
+of the .txt file.  The single-file edition (latex/church-history-single-file.tex), if it
+exists, is checked in the same way, block by block.  Only two things are allowed to differ:
 
   * white space next to a hyphen or dash (the source breaks lines there, and such
     lines are joined without a space), and
@@ -23,6 +24,7 @@ import re
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+SINGLE = os.path.join(ROOT, 'latex', 'church-history-single-file.tex')
 MOJIBAKE = '¬†'
 
 # command -> (optional arguments to drop, mandatory arguments, indexes kept, joiner)
@@ -138,14 +140,13 @@ def source_text(path):
     return canon(' '.join(l for l in lines if l).replace(MOJIBAKE, ' '))
 
 
-def main():
-    texs = sorted(glob.glob(os.path.join(ROOT, 'latex', '*', '*.tex')))
+def check(units, what):
+    """units: [(label, LaTeX text starting with '% Source: <file>')].  Returns the number of problems."""
     seen, bad, nchar, nword = set(), 0, 0, 0
-    for t in texs:
-        body = open(t, encoding='utf-8').read()
+    for label, body in units:
         m = re.match(r'% Source: (.+)\n', body)
         if not m:
-            print('NO SOURCE LINE:', t)
+            print('NO SOURCE LINE:', label)
             bad += 1
             continue
         src = os.path.join(ROOT, m.group(1))
@@ -158,7 +159,7 @@ def main():
         if a != b:
             bad += 1
             k = next((i for i, (x, y) in enumerate(zip(a, b)) if x != y), min(len(a), len(b)))
-            print('MISMATCH %s\n   source: ...%s\n   latex:  ...%s' % (os.path.relpath(t, ROOT), a[max(0, k - 50):k + 50], b[max(0, k - 50):k + 50]))
+            print('MISMATCH %s\n   source: ...%s\n   latex:  ...%s' % (label, a[max(0, k - 50):k + 50], b[max(0, k - 50):k + 50]))
         # spaces next to hyphens and dashes inside running text
         lines = [l.strip().replace(MOJIBAKE, ' ') for l in open(src, encoding='utf-8').read().split('\n')]
         in_source = sum(len(re.findall(r'[-–—] +(?=\S)|(?<=\S) +—', l)) for l in lines)
@@ -166,13 +167,40 @@ def main():
         if in_source != in_latex:
             bad += 1
             print('LINE JOIN %s: %d spaces next to a dash in the source lines, %d in the LaTeX text'
-                  % (os.path.relpath(t, ROOT), in_source, in_latex))
+                  % (label, in_source, in_latex))
     expected = {os.path.basename(f) for f in glob.glob(os.path.join(ROOT, '*.txt')) if '(1)' not in f}
     for name in sorted(expected - seen):
-        print('SOURCE FILE NOT CONVERTED:', name)
+        print('SOURCE FILE NOT CONVERTED (%s): %s' % (what, name))
         bad += 1
-    print('%d LaTeX files checked against %d source files: %d words, %d characters; %s'
-          % (len(texs), len(seen), nword, nchar, 'ALL IDENTICAL' if not bad else '%d PROBLEM(S)' % bad))
+    print('%s checked against %d source files: %d words, %d characters; %s'
+          % (what, len(seen), nword, nchar, 'ALL IDENTICAL' if not bad else '%d PROBLEM(S)' % bad))
+    return bad
+
+
+def split_single(path):
+    """The blocks of the single-file edition: one per '% Source:' line, without the lines of main.tex."""
+    text = open(path, encoding='utf-8').read()
+    text = text[re.search(r'(?m)^\\begin\{document\}', text).start():]
+    units = []
+    for block in re.split(r'(?m)^(?=% Source: )', text)[1:]:
+        lines = block.rstrip('\n').split('\n')
+        while re.fullmatch(r'\\(frontmatter|mainmatter|backmatter|end\{document\})|%.*|\s*', lines[-1]):
+            lines.pop()
+        units.append('\n'.join(lines) + '\n')
+    return units
+
+
+def main():
+    texs = sorted(glob.glob(os.path.join(ROOT, 'latex', '*', '*.tex')))
+    files = [(os.path.relpath(t, ROOT), open(t, encoding='utf-8').read()) for t in texs]
+    bad = check(files, '%d LaTeX files' % len(files))
+    if os.path.exists(SINGLE):
+        name = os.path.basename(SINGLE)
+        blocks = split_single(SINGLE)
+        bad += check([('%s, block %d' % (name, i + 1), b) for i, b in enumerate(blocks)],
+                     '%s (%d blocks)' % (name, len(blocks)))
+        if sorted(b.rstrip() for b in blocks) != sorted(body.rstrip() for _, body in files):
+            print('NOTE: %s is not up to date with the separate files; run tools/single_file.py' % name)
     return 1 if bad else 0
 
 
