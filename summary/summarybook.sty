@@ -70,7 +70,7 @@
   \refstepcounter{part}%
   \addcontentsline{toc}{part}{\protect\sbtocpart{#1}{#2}{#3}}%
   \markboth{#2}{#2}%
-  \vspace*{0.11\textheight}%
+  \vspace*{0.11\textheight minus 0.07\textheight}%   may shrink, so that the page can hold a few more lines
   \begingroup\centering
     {\sffamily\small\color{sbaccent}\textls[220]{PART #1}\par}\vspace{16pt}%
     {\huge #2\par}\vspace{10pt}%
@@ -82,9 +82,11 @@
   {\list{}{\leftmargin=1.4em \rightmargin=1.4em \topsep=0pt \partopsep=0pt \parsep=0.5\baselineskip
            \listparindent=0pt \itemindent=0pt}\item\relax}
   {\endlist}
+%% The chapter list of a part is never divided: it stands on the part page or, whole, on the next page.
 \newcommand{\partchapters}[1]{\par\vspace{1.6\baselineskip}%
-  \begingroup\centering\sblabel{In this part}\par\endgroup\vspace{6pt}%
-  \begingroup\small\leftskip=1.4em \rightskip=1.4em plus 1fil #1\par\endgroup}
+  \begingroup\centering\sblabel{In this part}\par\endgroup\nobreak\vspace{6pt}%
+  \begingroup\small\noindent
+    \vtop{\hsize=\linewidth \leftskip=1.4em \rightskip=1.4em plus 1fil #1\par}\par\endgroup}
 \newcommand{\pch}[3]{\par\noindent\hangindent=2.1em\hangafter=1\relax
   \makebox[1.5em][r]{\color{sbaccent}\bfseries #1}\hspace{0.6em}\hyperref[sbch:#1]{#2}\enspace{\itshape\color{sbgray}#3}\par}
 
@@ -225,14 +227,42 @@
     \begin{sb@side}\unvbox\sb@sidecontent\end{sb@side}%
   \fi}
 
-%% Small tables (the book's own tables, condensed): \begin{sumtable}{L{0.47\linewidth}L{0.47\linewidth}}
-%% header & header \\ \midrule  row & row \\ ... \end{sumtable}   (end the last row with \\)
+%% Small tables (the book's own tables, condensed):
+%%   \begin{sumtable}[Caption]{L{0.47\linewidth}L{0.47\linewidth}}
+%%   \sumhead{..} & \sumhead{..} \\ \midrule   row & row \\ ...   \end{sumtable}   (end the last row with \\)
+%% A table is never divided.  Where it does not fit on the page it goes to the top of the next page and the
+%% text runs on, so the sentence that introduces it must not depend on the table following at once.
 \newcolumntype{L}[1]{>{\raggedright\arraybackslash\hspace{0pt}}p{#1}}
 \newcolumntype{R}[1]{>{\raggedleft\arraybackslash\hspace{0pt}}p{#1}}
-\newenvironment{sumtable}[1]
-  {\par\vspace{5pt}\noindent\footnotesize\setlength{\tabcolsep}{5pt}\renewcommand{\arraystretch}{1.3}%
-   \begin{tabular}{@{}#1@{}}\toprule}
-  {\bottomrule\end{tabular}\par\vspace{5pt}}
+\newbox\sb@tabbox
+\newenvironment{sumtable}[2][]
+  {\par
+   \setbox\sb@tabbox=\vbox\bgroup\color@begingroup
+     \hsize=\linewidth \let\par\@@par \everypar{}\parindent=\z@
+     \def\sb@tabcaption{#1}%
+     \ifx\sb@tabcaption\@empty\else \noindent\sblabel{#1}\par\nobreak\vspace{4.5pt}\fi
+     \noindent\footnotesize\setlength{\tabcolsep}{5pt}\renewcommand{\arraystretch}{1.3}%
+     \begin{tabular}{@{}#2@{}}\toprule}
+  {\bottomrule\end{tabular}\par\color@endgroup\egroup
+   \sb@placetable}
+\newcommand*{\sb@placetable}{%
+  \dimen@=\ht\sb@tabbox \advance\dimen@\dp\sb@tabbox \advance\dimen@ 12pt
+  \count@=\z@                                   % 0: here   1: top of the next page
+  \ifinner\else
+    \ifx\@deferlist\@empty
+      \if@nobreak\else\ifdim\pagegoal<\maxdimen
+        \dimen@ii=\pagegoal \advance\dimen@ii-\pagetotal
+        \ifdim\dimen@>\dimen@ii \count@=\@ne \fi
+      \fi\fi
+    \else
+      \count@=\@ne                               % stay behind a box that waits for the next page
+    \fi
+  \fi
+  \ifcase\count@
+    \vspace{5pt}\noindent\box\sb@tabbox\par\vspace{5pt}%
+  \or
+    \@float{sbsidefloat}[t]\noindent\box\sb@tabbox\end@float
+  \fi}
 \newcommand{\sumhead}[1]{{\sffamily\bfseries\scriptsize #1}}
 
 %% Key facts at the end of a chapter.  The block is set first and then placed: in one piece where
@@ -312,7 +342,9 @@
 
 %% Chronology (back/chronology.tex, generated):
 %%   \chronhead{Fourth century}   \chron{325}{event}{ch.~\chref{10}}   \chronmore{event}{ch.~\chref{14}}
-%% \chronmore is a further event of the same date; it stays on the page of the entry before it.
+%% \chronmore is a further event of the same date.  The date is printed once; if a page break falls
+%% inside the group, the first entry on the new page shows the date again (in regular weight).  For this
+%% every entry notes its page in the .aux file, so the dates are right from the second run on.
 \newlength{\sb@chronw}
 \setlength{\sb@chronw}{5.7em}
 \newenvironment{chronology}
@@ -320,10 +352,26 @@
   {\par\endgroup}
 \newcommand{\chronhead}[1]{\par\addvspace{1.15\baselineskip}%
   \noindent\sblabel{#1}\par\nobreak\vspace{3pt}\nobreak}
+\newcount\sb@chronn
+\newcommand*{\sb@chronpage}[2]{\expandafter\gdef\csname sbcp@#1\endcsname{#2}}
+\newcommand*{\sb@chronmark}{%                  note the page of this entry in the .aux file
+  \global\advance\sb@chronn\@ne
+  \begingroup\edef\x{\endgroup
+    \noexpand\protected@write\noexpand\@auxout{}%
+      {\noexpand\string\noexpand\sb@chronpage{\the\sb@chronn}{\noexpand\thepage}}}\x}
+\newcommand*{\sb@chronlast}[1]{\expandafter\ifx\csname sbcp@#1\endcsname\relax ?\else\csname sbcp@#1\endcsname\fi}
+\newcommand*{\sb@ifnewpage}[2]{%               #1 if this entry began a new page in the last run, else #2
+  \begingroup \count@=\sb@chronn \advance\count@\m@ne
+  \edef\x{\endgroup\noexpand\sb@pagecmp{\sb@chronlast{\the\sb@chronn}}{\sb@chronlast{\the\count@}}}%
+  \x{#1}{#2}}
+\newcommand*{\sb@pagecmp}[4]{\def\sb@tempa{#1}\def\sb@tempb{#2}\ifx\sb@tempa\sb@tempb #4\else #3\fi}
 \newcommand{\chron}[3]{\par\noindent\hangindent=\sb@chronw\hangafter=1\relax
+  \sb@chronmark\gdef\sb@chrondate{#1}%
   \makebox[\sb@chronw][l]{\bfseries #1}#2\enspace{\footnotesize\color{sbgray}(#3)}\par}
-\newcommand{\chronmore}[2]{\par\nobreak\noindent\hangindent=\sb@chronw\hangafter=1\relax
-  \hspace*{\sb@chronw}#1\enspace{\footnotesize\color{sbgray}(#2)}\par}
+\newcommand{\chronmore}[2]{\par\noindent\hangindent=\sb@chronw\hangafter=1\relax
+  \sb@chronmark
+  \sb@ifnewpage{\makebox[\sb@chronw][l]{\sb@chrondate}}{\hspace*{\sb@chronw}}%
+  #1\enspace{\footnotesize\color{sbgray}(#2)}\par}
 %% A chapter number that links to the chapter (every \summarychapter{n} sets the label sbch:n).
 \newcommand{\chref}[1]{\hyperref[sbch:#1]{#1}}
 
