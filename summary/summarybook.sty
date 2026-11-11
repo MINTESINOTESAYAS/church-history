@@ -5,6 +5,7 @@
 %%   \summarychapter{n}{Title}{Subtitle}   inbrief (with \question{...})   \ssection{...}
 %%   sidebox{Title}   keyfacts with \keypeople{..} \keydates{\kd{year}{event}...} \keyterms{..}
 %%   \frontchapter{Title}  \backchapter{Title}   sumtable (small tables) with \sumhead{..}
+%%   back matter (generated): chronology with \chronhead \chron \chronmore \chref;  popecolumns with \pope
 \NeedsTeXFormat{LaTeX2e}
 \ProvidesPackage{summarybook}[2026/11/11 design of the summary volume]
 
@@ -85,7 +86,7 @@
   \begingroup\centering\sblabel{In this part}\par\endgroup\vspace{6pt}%
   \begingroup\small\leftskip=1.4em \rightskip=1.4em plus 1fil #1\par\endgroup}
 \newcommand{\pch}[3]{\par\noindent\hangindent=2.1em\hangafter=1\relax
-  \makebox[1.5em][r]{\color{sbaccent}\bfseries #1}\hspace{0.6em}#2\enspace{\itshape\color{sbgray}#3}\par}
+  \makebox[1.5em][r]{\color{sbaccent}\bfseries #1}\hspace{0.6em}\hyperref[sbch:#1]{#2}\enspace{\itshape\color{sbgray}#3}\par}
 
 %% ---------------------------------------------------------------------------------------
 %% Chapters
@@ -93,6 +94,7 @@
 \newcommand{\summarychapter}[3]{%
   \clearpage\thispagestyle{plain}%
   \setcounter{chapter}{#1}\addtocounter{chapter}{-1}\refstepcounter{chapter}%
+  \label{sbch:#1}%
   \addcontentsline{toc}{chapter}{\protect\sbtocch{#1}{#2}{#3}}%
   \markright{#2}%
   \vspace*{0.25in}%
@@ -120,6 +122,10 @@
   \@afterindentfalse\@afterheading}
 \newcommand{\frontchapter}{\sb@plainchapter}
 \newcommand{\backchapter}{\sb@plainchapter}
+%% Back matter: a gap in the contents, and PDF bookmarks beside the parts instead of inside Part Nine.
+\g@addto@macro\backmatter{%
+  \addtocontents{toc}{\protect\addvspace{1.05\baselineskip}}%
+  \gdef\toclevel@chapter{-1}\gdef\toclevel@section{0}}
 
 %% Section headings: in the PDF outline, not in the printed contents.
 \setcounter{secnumdepth}{0}
@@ -133,20 +139,56 @@
 %% ---------------------------------------------------------------------------------------
 %% Boxes
 %% ---------------------------------------------------------------------------------------
+%% \sb@need{length}: start a new page unless that much room is left on this one
+%% (not directly after a heading, which must stay with what follows it).
+\newcommand*{\sb@need}[1]{\par
+  \if@nobreak\else
+    \begingroup
+      \dimen@=#1\relax
+      \dimen@ii=\pagegoal \advance\dimen@ii-\pagetotal
+      \ifdim\dimen@>\dimen@ii \ifdim\dimen@ii>\z@ \break \fi\fi
+    \endgroup
+  \fi}
 \newmdenv[backgroundcolor=sbtint,linecolor=sbaccent,linewidth=2pt,topline=false,bottomline=false,
   rightline=false,innerleftmargin=11pt,innerrightmargin=11pt,innertopmargin=8pt,innerbottommargin=8pt,
   skipabove=0pt,skipbelow=0.5\baselineskip]{sb@inbrief}
+%% After the box the opening paragraph starts flush left.  (\@nobreakfalse: the chapter head has
+%% left \if@nobreak set, which would swallow the space above the first section heading.)
+\newcommand*{\sb@noindentnext}{\everypar{{\setbox\z@\lastbox}\everypar{}}}
 \newenvironment{inbrief}
   {\begin{sb@inbrief}\small\noindent\sblabel{In brief}\par\vspace{3pt}\noindent\ignorespaces}
-  {\end{sb@inbrief}\aftergroup\@afterindentfalse\aftergroup\@afterheading}
+  {\end{sb@inbrief}\@endpefalse\@nobreakfalse\aftergroup\sb@noindentnext}
 \newcommand{\question}[1]{\par\vspace{5pt}\noindent\sblabel{The question}\par\vspace{2pt}\noindent{\itshape #1}\par}
 
 \newmdenv[backgroundcolor=sbtint,linecolor=sbrule,linewidth=0.6pt,innerleftmargin=10pt,
   innerrightmargin=10pt,innertopmargin=8pt,innerbottommargin=8pt,
   skipabove=0.9\baselineskip,skipbelow=0.6\baselineskip]{sb@side}
+%% A sidebar is set first and then placed.  A short one stays in one piece (on the next page if
+%% this one has no room for it); a long one may run over the page, with at least three lines of a
+%% paragraph on either side, and does not start in the last lines of a page.
+\newbox\sb@sidecontent
 \newenvironment{sidebox}[1]
-  {\begin{sb@side}\small\noindent\sblabel{Sidebar}\hspace{0.8em}{\bfseries #1}\par\vspace{3pt}\noindent\ignorespaces}
-  {\end{sb@side}}
+  {\par
+   \setbox\sb@sidecontent=\vbox\bgroup\color@begingroup
+     \advance\linewidth-21.2pt \hsize=\linewidth      % the inner width of the frame sb@side
+     \let\par\@@par \everypar{}\small
+     \clubpenalties=3 \@M \@M \z@ \widowpenalties=3 \@M \@M \z@
+     \noindent\sblabel{Sidebar}\hspace{0.8em}{\bfseries #1}\par\nobreak\vspace{3pt}\noindent\ignorespaces}
+  {  \par\color@endgroup\egroup
+   \sb@placesidebox}
+\newcommand*{\sb@placesidebox}{%
+  \dimen@=\ht\sb@sidecontent \advance\dimen@\dp\sb@sidecontent
+  \advance\dimen@ 23pt \advance\dimen@ 0.9\baselineskip    % padding, frame, space above, a margin
+  \@tempswafalse
+  \if@nobreak\else\ifdim\pagegoal<\maxdimen
+    \dimen@ii=\pagegoal \advance\dimen@ii-\pagetotal
+    \ifdim\dimen@>\dimen@ii                                 % it does not fit on this page
+      \ifdim\dimen@<0.3\textheight \@tempswatrue \fi        % short: keep it whole
+      \ifdim\dimen@ii<7\baselineskip \@tempswatrue \fi      % no room to start it here
+    \fi
+  \fi\fi
+  \if@tempswa \break \fi
+  \begin{sb@side}\unvbox\sb@sidecontent\end{sb@side}}
 
 %% Small tables (the book's own tables, condensed): \begin{sumtable}{L{0.47\linewidth}L{0.47\linewidth}}
 %% header & header \\ \midrule  row & row \\ ... \end{sumtable}   (end the last row with \\)
@@ -158,16 +200,45 @@
   {\bottomrule\end{tabular}\par\vspace{5pt}}
 \newcommand{\sumhead}[1]{{\sffamily\bfseries\scriptsize #1}}
 
-%% Key facts at the end of a chapter.
+%% Key facts at the end of a chapter.  The block is set first and then placed: in one piece where
+%% it fits; in one piece on the next page when little room is left on this one; otherwise it runs
+%% over the page between two entries (the key terms always stay with the closing rule).
+\newbox\sb@kfbox
 \newenvironment{keyfacts}
-  {\par\addvspace{1.5\baselineskip}\noindent\begin{minipage}{\linewidth}\small\parindent=0pt
-   \noindent{\color{sbaccent}\rule{\linewidth}{1pt}}\par\nobreak}
-  {\par\nobreak\vspace{5pt}\noindent{\color{sbrule}\rule{\linewidth}{0.5pt}}\end{minipage}\par}
+  {\par
+   \setbox\sb@kfbox=\vbox\bgroup\color@begingroup
+     \hsize=\linewidth \let\par\@@par \everypar{}%
+     \small\parindent=0pt \clubpenalty=\@M \widowpenalty=\@M
+     \noindent{\color{sbaccent}\rule{\linewidth}{1pt}}\par\nobreak}
+  {  \par\nobreak\vspace{5pt}\noindent{\color{sbrule}\rule{\linewidth}{0.5pt}}\par
+   \color@endgroup\egroup
+   \sb@placekeyfacts}
+\newcommand*{\sb@placekeyfacts}{%
+  \dimen@=\ht\sb@kfbox \advance\dimen@\dp\sb@kfbox \advance\dimen@ 2pt      % height of the block
+  \ifdim\pagegoal=\maxdimen
+    \dimen@ii=\maxdimen                                                     % empty page
+  \else
+    \dimen@ii=\pagegoal \advance\dimen@ii-\pagetotal \advance\dimen@ii-1.5\baselineskip
+  \fi
+  \@tempswafalse
+  \ifdim\dimen@>\dimen@ii
+    \ifdim\dimen@ii<0.3\textheight \ifdim\dimen@<\textheight \@tempswatrue \fi\fi
+  \fi
+  \if@tempswa \newpage \else \addvspace{1.5\baselineskip}\fi
+  \unvbox\sb@kfbox}
 \newcommand{\sb@keyhead}[1]{\par\vspace{5pt}\noindent\sblabel{#1}\par\nobreak\vspace{1pt}}
 \newcommand{\keypeople}[1]{\sb@keyhead{Key people}{\raggedright\noindent\ignorespaces #1\par}}
-\newcommand{\keyterms}[1]{\sb@keyhead{Key terms}{\raggedright\noindent\ignorespaces #1\par}}
-\newcommand{\keydates}[1]{\sb@keyhead{Key dates}{\raggedright #1\par}}
-\newcommand{\kd}[2]{\par\noindent\hangindent=6.3em\hangafter=1\relax\makebox[6.3em][l]{\bfseries #1}#2\par}
+\newcommand{\keyterms}[1]{\sb@keyhead{Key terms}{\raggedright\interlinepenalty=\@M\noindent\ignorespaces #1\par}}
+%% The last three dates stay with the key terms, so that a block that runs over the page does not
+%% leave two or three lines on the last page of the chapter.
+\newcount\sb@kdn \newcount\sb@kdi
+\newcommand{\keydates}[1]{\sb@keyhead{Key dates}{\raggedright
+  \sb@kdn=\z@ \begingroup\def\kd##1##2{\global\advance\sb@kdn\@ne}#1\endgroup
+  \sb@kdi=\z@ #1\par}}
+\newcommand{\kd}[2]{\par\noindent\hangindent=6.3em\hangafter=1\relax\makebox[6.3em][l]{\bfseries #1}#2\par
+  \advance\sb@kdi\@ne \advance\sb@kdi\tw@
+  \ifnum\sb@kdi<\sb@kdn \else \nobreak \fi
+  \advance\sb@kdi-\tw@}
 
 %% ---------------------------------------------------------------------------------------
 %% Contents
@@ -197,15 +268,37 @@
 \newcommand{\age}[4]{\par\addvspace{0.75\baselineskip}\noindent
   \makebox[1.2em][l]{\color{sbaccent}\bfseries #1}{\bfseries #2}\enspace{\small\color{sbgray}#3}\par\nobreak
   \noindent\hspace*{1.2em}\parbox[t]{\dimexpr\linewidth-1.2em\relax}{\small\strut #4\strut}\par}
+%% List of popes (back/popes.tex, generated): popecolumns with \pope{years}{name}, then popelegend.
 \newenvironment{popecolumns}{\begin{multicols}{3}\footnotesize\raggedright}{\end{multicols}}
 \newcommand{\pope}[2]{\noindent\hangindent=1em\hangafter=1\relax{\color{sbgray}#1}\enspace #2\par}
-\newcommand{\chron}[3]{\par\noindent\hangindent=6.3em\hangafter=1\relax
-  \makebox[6.3em][l]{\bfseries #1}#2\enspace{\footnotesize\color{sbgray}(ch.~#3)}\par}
+\newenvironment{popelegend}{\par\addvspace{0.9\baselineskip}\begingroup\footnotesize\raggedright}{\par\endgroup}
+\newcommand{\popemark}{\par\noindent}
+
+%% Chronology (back/chronology.tex, generated):
+%%   \chronhead{Fourth century}   \chron{325}{event}{ch.~\chref{10}}   \chronmore{event}{ch.~\chref{14}}
+%% \chronmore is a further event of the same date; it stays on the page of the entry before it.
+\newlength{\sb@chronw}
+\setlength{\sb@chronw}{5.7em}
+\newenvironment{chronology}
+  {\par\begingroup\small\raggedright\setlength{\parskip}{1.5pt}}
+  {\par\endgroup}
+\newcommand{\chronhead}[1]{\par\addvspace{1.15\baselineskip}%
+  \noindent\sblabel{#1}\par\nobreak\vspace{3pt}\nobreak}
+\newcommand{\chron}[3]{\par\noindent\hangindent=\sb@chronw\hangafter=1\relax
+  \makebox[\sb@chronw][l]{\bfseries #1}#2\enspace{\footnotesize\color{sbgray}(#3)}\par}
+\newcommand{\chronmore}[2]{\par\nobreak\noindent\hangindent=\sb@chronw\hangafter=1\relax
+  \hspace*{\sb@chronw}#1\enspace{\footnotesize\color{sbgray}(#2)}\par}
+%% A chapter number that links to the chapter (every \summarychapter{n} sets the label sbch:n).
+\newcommand{\chref}[1]{\hyperref[sbch:#1]{#1}}
 
 %% ---------------------------------------------------------------------------------------
 %% PDF outline and links
 %% ---------------------------------------------------------------------------------------
 \RequirePackage[hidelinks,bookmarksopen=false,bookmarksdepth=2]{hyperref}
+\@namedef{sb@pn@ONE}{One}\@namedef{sb@pn@TWO}{Two}\@namedef{sb@pn@THREE}{Three}
+\@namedef{sb@pn@FOUR}{Four}\@namedef{sb@pn@FIVE}{Five}\@namedef{sb@pn@SIX}{Six}
+\@namedef{sb@pn@SEVEN}{Seven}\@namedef{sb@pn@EIGHT}{Eight}\@namedef{sb@pn@NINE}{Nine}
 \pdfstringdefDisableCommands{%
-  \def\sbtocch#1#2#3{#1. #2}\def\sbtocpart#1#2#3{Part #1: #2}\def\sbtocplain#1{#1}}
+  \def\sbtocch#1#2#3{#1. #2}\def\sbtocpart#1#2#3{Part \csname sb@pn@#1\endcsname: #2}%
+  \def\sbtocplain#1{#1}}
 \endinput
