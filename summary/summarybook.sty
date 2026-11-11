@@ -163,10 +163,19 @@
 \newmdenv[backgroundcolor=sbtint,linecolor=sbrule,linewidth=0.6pt,innerleftmargin=10pt,
   innerrightmargin=10pt,innertopmargin=8pt,innerbottommargin=8pt,
   skipabove=0.9\baselineskip,skipbelow=0.6\baselineskip]{sb@side}
-%% A sidebar is set first and then placed.  A short one stays in one piece (on the next page if
-%% this one has no room for it); a long one may run over the page, with at least three lines of a
-%% paragraph on either side, and does not start in the last lines of a page.
+%% A sidebar is set first and then placed:
+%%   - where it stands, if the page has room for it;
+%%   - otherwise at the top of the next page, as a float, while the text runs on (so that neither a
+%%     short page nor a broken box results);
+%%   - a sidebar of more than 0.6 of the text height may instead run over the page, if at least
+%%     title + 4 lines stay before the break and 5 lines follow it (3 lines of any one paragraph).
 \newbox\sb@sidecontent
+\newcommand*\fps@sbsidefloat{t}
+\newcommand*\ftype@sbsidefloat{4}
+\setcounter{topnumber}{2}\setcounter{totalnumber}{3}
+\renewcommand{\topfraction}{0.9}\renewcommand{\textfraction}{0.08}\renewcommand{\floatpagefraction}{0.97}
+\setlength{\textfloatsep}{12pt plus 2pt minus 2pt}\setlength{\floatsep}{12pt plus 2pt minus 2pt}
+\@fptop=\z@skip \@fpsep=12pt \@fpbot=0pt plus 1fil
 \newenvironment{sidebox}[1]
   {\par
    \setbox\sb@sidecontent=\vbox\bgroup\color@begingroup
@@ -177,18 +186,44 @@
   {  \par\color@endgroup\egroup
    \sb@placesidebox}
 \newcommand*{\sb@placesidebox}{%
+  \vbadness=\@M \vfuzz=\maxdimen                            % trial splits are not worth a log entry
   \dimen@=\ht\sb@sidecontent \advance\dimen@\dp\sb@sidecontent
   \advance\dimen@ 23pt \advance\dimen@ 0.9\baselineskip    % padding, frame, space above, a margin
-  \@tempswafalse
-  \if@nobreak\else\ifdim\pagegoal<\maxdimen
-    \dimen@ii=\pagegoal \advance\dimen@ii-\pagetotal
-    \ifdim\dimen@>\dimen@ii                                 % it does not fit on this page
-      \ifdim\dimen@<0.3\textheight \@tempswatrue \fi        % short: keep it whole
-      \ifdim\dimen@ii<7\baselineskip \@tempswatrue \fi      % no room to start it here
-    \fi
-  \fi\fi
-  \if@tempswa \break \fi
-  \begin{sb@side}\unvbox\sb@sidecontent\end{sb@side}}
+  \count@=\z@                           % 0: here   1: top of the next page   2: new page, then here
+  \ifx\@deferlist\@empty
+    \if@nobreak\else\ifdim\pagegoal<\maxdimen
+      \dimen@ii=\pagegoal \advance\dimen@ii-\pagetotal
+      \ifdim\dimen@>\dimen@ii                               % it does not fit on this page
+        \ifdim\dimen@<0.6\textheight
+          \count@=\@ne
+        \else
+          \ifdim\dimen@ii<7\baselineskip \count@=\tw@ \fi   % no room to start it here
+          \ifnum\count@=\z@ \ifdim\dimen@<\textheight       % would it split well?  try it on a copy
+            \advance\dimen@ii-23pt \advance\dimen@ii-0.9\baselineskip
+            \setbox\@tempboxa=\copy\sb@sidecontent
+            \setbox\z@=\vsplit\@tempboxa to\dimen@ii
+            \setbox\z@=\vbox{\unvbox\z@}%
+            \ifdim\ht\z@<60pt \count@=\tw@ \fi
+            \ifdim\ht\@tempboxa<52pt \count@=\tw@ \fi
+            \setbox\z@=\box\voidb@x \setbox\@tempboxa=\box\voidb@x
+          \fi\fi
+          \ifnum\count@=\tw@ \ifdim\dimen@<0.8\textheight \count@=\@ne \fi\fi
+        \fi
+      \fi
+    \fi\fi
+  \else                                 % an earlier sidebar waits for the next page: stay behind it
+    \ifdim\dimen@<0.8\textheight \count@=\@ne \else \count@=\tw@ \fi
+  \fi
+  \ifcase\count@
+    \begin{sb@side}\unvbox\sb@sidecontent\end{sb@side}%
+  \or
+    \@float{sbsidefloat}[t]%
+      \begin{sb@side}[skipabove=0pt,skipbelow=0pt]\unvbox\sb@sidecontent\end{sb@side}%
+    \end@float
+  \else
+    \newpage
+    \begin{sb@side}\unvbox\sb@sidecontent\end{sb@side}%
+  \fi}
 
 %% Small tables (the book's own tables, condensed): \begin{sumtable}{L{0.47\linewidth}L{0.47\linewidth}}
 %% header & header \\ \midrule  row & row \\ ... \end{sumtable}   (end the last row with \\)
@@ -214,6 +249,7 @@
    \color@endgroup\egroup
    \sb@placekeyfacts}
 \newcommand*{\sb@placekeyfacts}{%
+  \ifx\@deferlist\@empty\else \newpage \fi            % a sidebar waits for the next page: it comes first
   \dimen@=\ht\sb@kfbox \advance\dimen@\dp\sb@kfbox \advance\dimen@ 2pt      % height of the block
   \ifdim\pagegoal=\maxdimen
     \dimen@ii=\maxdimen                                                     % empty page
