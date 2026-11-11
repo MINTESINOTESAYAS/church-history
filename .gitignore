@@ -11,3 +11,10 @@ latex/*.fls
 latex/*.fdb_latexmk
 latex/*.synctex.gz
 latex/*.xdv
+
+# Summary volume build files (the compiled summary/church-history-summary.pdf is kept)
+summary/*.aux
+summary/*.log
+summary/*.out
+summary/*.toc
+summary/summary.pdf
