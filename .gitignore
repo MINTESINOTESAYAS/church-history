@@ -1,0 +1,13 @@
+# Python
+__pycache__/
+
+# LaTeX build files
+latex/**/*.aux
+latex/*.aux
+latex/*.log
+latex/*.out
+latex/*.toc
+latex/*.fls
+latex/*.fdb_latexmk
+latex/*.synctex.gz
+latex/*.xdv

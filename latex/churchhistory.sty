@@ -1,0 +1,295 @@
+%% churchhistory.sty -- page layout and structural macros for the book in this directory.
+%%
+%% The chapter files only use the commands defined here, so the whole look of the book
+%% (page size, fonts, headings, sidebars ...) can be changed in this one file.
+%% Works with pdfLaTeX, XeLaTeX and LuaLaTeX.
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{churchhistory}[2026/11/10 book layout]
+
+%% ---------------------------------------------------------------------------------------
+%% Engine, encoding, fonts
+%% ---------------------------------------------------------------------------------------
+\RequirePackage{iftex}
+\newif\ifch@fontspecfont
+\ifPDFTeX
+  \RequirePackage[T1]{fontenc}
+  \RequirePackage[utf8]{inputenc}
+  \RequirePackage{textcomp}
+  \RequirePackage{mathpazo}            % Palatino
+  \linespread{1.04}
+  \IfFileExists{glyphtounicode.tex}{\input{glyphtounicode}\pdfgentounicode=1 }{}% searchable PDF text
+\else
+  \RequirePackage{fontspec}            % Latin Modern unless TeX Gyre Pagella is installed
+  \IfFontExistsTF{TeX Gyre Pagella}%
+    {\setmainfont{TeX Gyre Pagella}\linespread{1.04}\ch@fontspecfonttrue}{}
+\fi
+
+%% ---------------------------------------------------------------------------------------
+%% Page: 6in x 9in.  Change this one line for another trim size (e.g. a4paper).
+%% ---------------------------------------------------------------------------------------
+\RequirePackage[paperwidth=6in,paperheight=9in,inner=0.82in,outer=0.68in,
+                top=0.85in,bottom=0.8in,headheight=14pt,headsep=15pt,footskip=26pt]{geometry}
+
+\RequirePackage{microtype}
+\RequirePackage{array}
+\RequirePackage{booktabs}
+\RequirePackage{multicol}
+\RequirePackage{fancyhdr}
+
+\frenchspacing
+\raggedbottom
+\setlength{\parindent}{1.2em}
+\setlength{\parskip}{0pt}
+\tolerance=500
+\setlength{\emergencystretch}{2.5em}
+\hbadness=1500
+\clubpenalty=6000 \@clubpenalty=\clubpenalty \widowpenalty=6000
+\newlength{\ch@blockskip}
+\setlength{\ch@blockskip}{0.7\baselineskip plus 2pt minus 2pt}
+
+%% Letter-spaced capitals for small labels (XeTeX can only do this with a fontspec font).
+\ifXeTeX
+  \ifch@fontspecfont
+    \newcommand*{\ch@spaced}[1]{{\addfontfeature{LetterSpace=7}#1}}
+  \else
+    \newcommand*{\ch@spaced}[1]{#1}
+  \fi
+\else
+  \newcommand*{\ch@spaced}[1]{\textls[70]{#1}}
+\fi
+
+%% ---------------------------------------------------------------------------------------
+%% Dashes.  The text uses the Unicode characters; TeX would never break a line after them,
+%% so "word—word" or "1694–1778" becomes one long box.  Allow a break after a dash that is
+%% followed by a letter or digit, but not before closing punctuation.  (LuaTeX is left to
+%% its default behaviour.)
+%% ---------------------------------------------------------------------------------------
+\newcommand*{\ch@allowbreak}{\penalty\exhyphenpenalty\hskip\z@skip}
+\ifPDFTeX
+  \DeclareRobustCommand{\ch@emdash}{\textemdash\futurelet\ch@next\ch@embreak}
+  \newcommand*{\ch@embreak}{\ifcat\noexpand\ch@next a\ch@allowbreak\fi}
+  \DeclareRobustCommand{\ch@endash}{\textendash\futurelet\ch@next\ch@enbreak}
+  \newcommand*{\ch@enbreak}{%
+    \ifcat\noexpand\ch@next a\ch@allowbreak\else\ifcat\noexpand\ch@next 1\ch@allowbreak\fi\fi}
+  \DeclareUnicodeCharacter{2014}{\ch@emdash}
+  \DeclareUnicodeCharacter{2013}{\ch@endash}
+\else\ifXeTeX
+  \XeTeXdashbreakstate=0
+  \newXeTeXintercharclass\ch@dashclass
+  \newXeTeXintercharclass\ch@closeclass
+  \XeTeXcharclass"2014=\ch@dashclass   \XeTeXcharclass"2013=\ch@dashclass
+  \XeTeXcharclass"201D=\ch@closeclass  \XeTeXcharclass"2019=\ch@closeclass   % closing quotes
+  \XeTeXcharclass`\)=\ch@closeclass    \XeTeXcharclass`\]=\ch@closeclass
+  \XeTeXcharclass`\.=\ch@closeclass    \XeTeXcharclass`\,=\ch@closeclass
+  \XeTeXcharclass`\;=\ch@closeclass    \XeTeXcharclass`\:=\ch@closeclass
+  \XeTeXcharclass`\?=\ch@closeclass    \XeTeXcharclass`\!=\ch@closeclass
+  \XeTeXinterchartoks\ch@dashclass 0={\ch@allowbreak}
+  \XeTeXinterchartokenstate=1
+\fi\fi
+
+%% ---------------------------------------------------------------------------------------
+%% Running heads: part title on left-hand pages, chapter title on right-hand pages.
+%% ---------------------------------------------------------------------------------------
+\pagestyle{fancy}
+\fancyhf{}
+\renewcommand{\headrulewidth}{0pt}
+\fancyhead[LE,RO]{\small\thepage}
+\fancyhead[CE]{\small\itshape\leftmark}
+\fancyhead[CO]{\small\itshape\rightmark}
+\fancypagestyle{plain}{\fancyhf{}\fancyfoot[C]{\small\thepage}}
+\newcommand*{\ch@parttitle}{}
+%% Chapters start on the next page.  For chapters that always open on a right-hand page,
+%% replace \clearpage by \ch@cleartorecto in the next line.
+\newcommand*{\ch@openchapter}{\clearpage\thispagestyle{plain}}
+\newcommand*{\ch@cleartorecto}{\clearpage
+  \if@twoside\ifodd\c@page\else\hbox{}\thispagestyle{empty}\newpage\fi\fi}
+\let\cleardoublepage\ch@cleartorecto        % skipped left-hand pages stay completely empty
+
+%% ---------------------------------------------------------------------------------------
+%% Parts
+%%   \bookpart[Short title]{TITLE}{DATES}  \begin{partsummary}...\end{partsummary}
+%%   \timelinetitle{...}   title of the timeline that follows the part page in the printed
+%%                         book (the graphic itself is not in the text source)
+%% ---------------------------------------------------------------------------------------
+\newcommand{\bookpart}[3][]{%
+  \ch@cleartorecto\thispagestyle{empty}%
+  \refstepcounter{part}%
+  \edef\ch@lab{part:\arabic{part}}\expandafter\label\expandafter{\ch@lab}%
+  \addcontentsline{toc}{part}{#1}%
+  \gdef\ch@parttitle{#1}\markboth{#1}{#1}%
+  \vspace*{0.14\textheight}%
+  \begingroup\centering
+    {\huge #2\par}\vspace{1.1\baselineskip}%
+    {\Large #3\par}%
+  \endgroup
+  \vspace{2.2\baselineskip}}
+\newenvironment{partsummary}
+  {\list{}{\leftmargin=1.6em \rightmargin=1.6em \topsep=0pt \partopsep=0pt \parsep=0pt}\item\relax}
+  {\endlist}
+\newcommand{\timelinetitle}[1]{%
+  \clearpage\thispagestyle{empty}%
+  \vspace*{0.3\textheight}%
+  {\centering\rule{4em}{0.4pt}\par\vspace{0.8\baselineskip}%
+   {\large #1\par}\vspace{0.6\baselineskip}\rule{4em}{0.4pt}\par}%
+  \clearpage}
+
+%% ---------------------------------------------------------------------------------------
+%% Chapters
+%%   \bookchapter[Short title]{CHAPTER 1}{TITLE}{Subtitle}
+%%   \frontchapter[Short title]{TITLE}{label}   (also used in the back matter)
+%%   \leadin{W}{HAT DOES ONE DO} with ...      opening words of a chapter
+%% ---------------------------------------------------------------------------------------
+\newcommand{\bookchapter}[4][]{%
+  \ch@openchapter
+  \refstepcounter{chapter}%
+  \edef\ch@lab{ch:\arabic{chapter}}\expandafter\label\expandafter{\ch@lab}%
+  \addcontentsline{toc}{chapter}{Chapter \arabic{chapter}: #1}%
+  \markboth{\ch@parttitle}{#1}%
+  \vspace*{1.2\baselineskip}%
+  \begingroup\centering
+    {\small\ch@spaced{#2}\par}\vspace{0.9\baselineskip}%
+    {\LARGE #3\par}\vspace{0.55\baselineskip}%
+    {\large\itshape #4\par}%
+  \endgroup
+  \vspace{2.2\baselineskip}%
+  \@afterindentfalse\@afterheading}
+
+\newcommand*{\ch@toclevel}{chapter}
+\newcommand{\frontchapter}[3][]{%
+  \ch@openchapter
+  \phantomsection\label{#3}%
+  \def\ch@short{#1}\ifx\ch@short\@empty\def\ch@short{#2}\fi
+  \addcontentsline{toc}{\ch@toclevel}{\ch@short}%
+  \markboth{\ch@short}{\ch@short}%
+  \vspace*{1.2\baselineskip}%
+  {\centering\LARGE #2\par}%
+  \vspace{2.2\baselineskip}%
+  \@afterindentfalse\@afterheading}
+%% In the back matter the outline entries go to the top level, not under the last part.
+\newcommand{\backchapter}{\renewcommand*{\ch@toclevel}{part}\frontchapter}
+
+\newcommand*{\leadin}[2]{\noindent{\fontsize{21}{21}\selectfont #1}{\footnotesize\ch@spaced{#2}}}
+
+%% Section headings (capitals in the source), unnumbered, listed in the PDF outline.
+\setcounter{secnumdepth}{0}
+\renewcommand{\section}{\@startsection{section}{1}{\z@}%
+  {-1.5\baselineskip \@plus -4pt \@minus -2pt}{0.6\baselineskip \@plus 2pt}%
+  {\normalfont\small\bfseries\raggedright\ch@spaced}}
+\renewcommand{\sectionmark}[1]{}
+
+\newcommand{\byline}[1]{\par\addvspace{\baselineskip}%
+  {\centering\large #1\par}\nobreak\vspace{0.8\baselineskip}\@afterindentfalse\@afterheading}
+
+%% ---------------------------------------------------------------------------------------
+%% Blocks inside the text
+%% ---------------------------------------------------------------------------------------
+%% Block quotation: first paragraph flush, later ones indented.
+\newenvironment{blockquote}
+  {\list{}{\leftmargin=1.5em \rightmargin=1.5em \topsep=\ch@blockskip \partopsep=0pt
+           \parsep=0pt \itemsep=0pt \listparindent=\parindent \itemindent=0pt}%
+   \small\item\relax}
+  {\endlist}
+
+%% Poetry, creeds: one source line per line (ended by \\), long lines hang.
+\newenvironment{poem}
+  {\let\\\@centercr
+   \list{}{\leftmargin=3.5em \rightmargin=1.5em \topsep=\ch@blockskip \partopsep=0pt
+           \parsep=0pt \itemsep=0pt \itemindent=-1.5em \listparindent=\itemindent}%
+   \small\rightskip=0pt plus 2em\relax\item\relax}
+  {\endlist}
+\newenvironment{plainlines}{\begin{poem}}{\end{poem}}
+\newenvironment{centerlines}
+  {\par\addvspace{\ch@blockskip}\begingroup\centering\small}
+  {\par\endgroup\addvspace{\ch@blockskip}}
+
+%% Numbered list with the labels of the source: \item[1.] ...
+\newenvironment{numlist}
+  {\list{}{\leftmargin=2em \labelwidth=1.2em \labelsep=0.6em \rightmargin=0pt
+           \topsep=0.5\baselineskip \partopsep=0pt \parsep=0pt \itemsep=0.25\baselineskip
+           \listparindent=\parindent}}
+  {\endlist}
+
+%% Sidebar ("text box"): \begin{sidebar}{Title} ... \end{sidebar}; \sidebarhead{...} inside.
+\newenvironment{sidebar}[1]
+  {\par\addvspace{1.1\baselineskip}%
+   \noindent\rule{\linewidth}{0.8pt}\par\nobreak\vspace{0.2\baselineskip}%
+   \list{}{\leftmargin=0.8em \rightmargin=0.8em \topsep=0pt \partopsep=0pt \parsep=0pt
+           \itemsep=0pt \listparindent=\parindent \itemindent=0pt}%
+   \small\item\relax
+   {\bfseries #1\par}\nobreak\vspace{0.35\baselineskip}%
+   \@afterindentfalse\@afterheading}
+  {\endlist\nobreak\vspace{0.25\baselineskip}%
+   \noindent\rule{\linewidth}{0.8pt}\par\addvspace{1.1\baselineskip}}
+\newcommand{\sidebarhead}[1]{\par\addvspace{0.6\baselineskip}%
+  {\noindent\itshape #1\par}\nobreak\vspace{0.15\baselineskip}\@afterindentfalse\@afterheading}
+
+%% Caption of an illustration and title of a chart / map / timeline.  The graphics are not
+%% part of the text source; redefine these two commands to place real figures.
+\newcommand{\figcaption}[1]{\par\addvspace{\ch@blockskip}%
+  {\centering\begin{minipage}{0.6\linewidth}\centering\footnotesize
+   \rule{3em}{0.4pt}\par\vspace{0.3\baselineskip}#1\par\vspace{0.1\baselineskip}\rule{3em}{0.4pt}%
+   \end{minipage}\par}\addvspace{\ch@blockskip}}
+\newcommand{\figtitle}[1]{\par\addvspace{\ch@blockskip}%
+  {\centering\small\bfseries #1\par}\addvspace{\ch@blockskip}}
+
+%% Tables.
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1\linewidth}}
+\newcolumntype{C}[1]{>{\centering\arraybackslash}p{#1\linewidth}}
+\newif\ifch@titled
+\newcommand{\tabletitle}[1]{\par\addvspace{\ch@blockskip}%
+  {\centering\small\bfseries #1\par}\nobreak\vspace{0.3\baselineskip}\global\ch@titledtrue}
+\newenvironment{booktable}[1]
+  {\par\ifch@titled\global\ch@titledfalse\else\addvspace{\ch@blockskip}\fi
+   \begingroup\centering\footnotesize\begin{tabular}{#1}}
+  {\end{tabular}\par\endgroup\addvspace{\ch@blockskip}}
+
+%% ---------------------------------------------------------------------------------------
+%% Reading lists and notes: entries with a hanging indent, each started by \entry.
+%% ---------------------------------------------------------------------------------------
+\newcommand*{\ch@entry}{\par\noindent\hangindent=1.5em\hangafter=1\relax}
+\newcommand{\readinghead}[1]{\par\addvspace{1.6\baselineskip}%
+  {\noindent\normalfont\bfseries #1\par}\nobreak\vspace{0.5\baselineskip}}
+\newenvironment{readinglist}{\begingroup\small\raggedright\let\entry\ch@entry}{\par\endgroup}
+\newcommand{\noteshead}[1]{\par\addvspace{1.1\baselineskip}%
+  {\noindent\bfseries #1\par}\nobreak\vspace{0.35\baselineskip}}
+\newenvironment{notelist}{\begingroup\small\let\entry\ch@entry}{\par\endgroup}
+
+%% ---------------------------------------------------------------------------------------
+%% Front and back matter
+%% ---------------------------------------------------------------------------------------
+\newenvironment{dedication}
+  {\clearpage\thispagestyle{empty}\vspace*{0.26\textheight}\begingroup\centering\itshape}
+  {\par\endgroup\ch@cleartorecto}
+\newenvironment{signature}{\par\addvspace{\baselineskip}\begingroup\raggedleft}{\par\endgroup}
+\newenvironment{epigraphblock}
+  {\list{}{\leftmargin=2.2em \rightmargin=2.2em \topsep=\ch@blockskip \partopsep=0pt \parsep=0pt}%
+   \small\item\relax}
+  {\endlist}
+\newcommand{\epigraphsource}[2]{\par\nobreak\vspace{0.4\baselineskip}%
+  {\raggedleft #1\\{\footnotesize #2}\par}}
+
+%% Contents page (typeset from the book's own contents list, with page numbers added).
+\newcommand*{\ch@dots}{\nobreak\leaders\hbox to 0.7em{\hss.\hss}\hfill\nobreak}
+\newcommand{\tocentry}[2]{\par\noindent #1\ch@dots\pageref{#2}\par}
+\newcommand{\tocentryplain}[1]{\par\noindent #1\par}
+\newcommand{\tocpart}[2]{\par\addvspace{0.9\baselineskip}%
+  \noindent{\bfseries #1}\ch@dots\pageref{#2}\par\nobreak\vspace{0.25\baselineskip}}
+\newcommand{\tocchapter}[4]{\par\noindent
+  \makebox[5.4em][l]{\scriptsize\ch@spaced{#1}}#2\ch@dots\pageref{#4}\par\nobreak
+  \noindent\hspace*{5.4em}{\small\itshape #3}\par}
+
+%% List of popes.
+\newcommand{\popesintro}[1]{\noindent #1\par\vspace{0.6\baselineskip}}
+\newenvironment{popelist}{\begin{multicols}{2}\small\raggedright}{\end{multicols}}
+\newcommand{\pope}[2]{\noindent\makebox[5.2em][l]{#1}#2\par}
+\newenvironment{popelegend}{\par\addvspace{0.8\baselineskip}\begingroup\small\raggedright\noindent\ignorespaces}{\par\endgroup}
+
+%% ---------------------------------------------------------------------------------------
+%% PDF outline and links (loaded last)
+%% ---------------------------------------------------------------------------------------
+\RequirePackage[hidelinks,bookmarksopen=false]{hyperref}
+\urlstyle{same}
+\pdfstringdefDisableCommands{\def\ch@spaced#1{#1}%
+  \ifPDFTeX\def\ch@emdash{\textemdash}\def\ch@endash{\textendash}\fi}
+
+\endinput
