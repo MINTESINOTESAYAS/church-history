@@ -11,7 +11,7 @@ Reported per file:
     short phrases of the author that the summary quotes as such).
 
 Usage:  python3 tools/summary_overlap.py [options]
-  --max-run N     fail (exit status 1) if an unquoted shared run is longer than N words (default 9)
+  --max-run N     fail (exit status 1) if an unquoted shared run is longer than N words (default 8)
   --max-quote N   fail if a quoted shared run is longer than N words (default 45)
   --list N        list every unquoted shared run of at least N words with its sentence
   --quotes N      list every quoted shared run of at least N words
@@ -143,7 +143,7 @@ def opt(name, default):
     return int(sys.argv[sys.argv.index(name) + 1]) if name in sys.argv else default
 
 def main():
-    max_run, max_quote = opt('--max-run', 9), opt('--max-quote', 45)
+    max_run, max_quote = opt("--max-run", 8), opt("--max-quote", 45)
     list_n, quote_n = opt('--list', 0), opt('--quotes', 0)
     only = sys.argv[sys.argv.index('--only') + 1] if '--only' in sys.argv else ''
     worst = worst_q = 0
