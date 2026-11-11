@@ -4,7 +4,7 @@
 %%   \summarypart{ONE}{Title}{dates}  partoverview  \partchapters{...} with \pch{n}{Title}{Subtitle}
 %%   \summarychapter{n}{Title}{Subtitle}   inbrief (with \question{...})   \ssection{...}
 %%   sidebox{Title}   keyfacts with \keypeople{..} \keydates{\kd{year}{event}...} \keyterms{..}
-%%   \frontchapter{Title}  \backchapter{Title}
+%%   \frontchapter{Title}  \backchapter{Title}   sumtable (small tables) with \sumhead{..}
 \NeedsTeXFormat{LaTeX2e}
 \ProvidesPackage{summarybook}[2026/11/11 design of the summary volume]
 
@@ -147,6 +147,16 @@
 \newenvironment{sidebox}[1]
   {\begin{sb@side}\small\noindent\sblabel{Sidebar}\hspace{0.8em}{\bfseries #1}\par\vspace{3pt}\noindent\ignorespaces}
   {\end{sb@side}}
+
+%% Small tables (the book's own tables, condensed): \begin{sumtable}{L{0.47\linewidth}L{0.47\linewidth}}
+%% header & header \\ \midrule  row & row \\ ... \end{sumtable}   (end the last row with \\)
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash\hspace{0pt}}p{#1}}
+\newcolumntype{R}[1]{>{\raggedleft\arraybackslash\hspace{0pt}}p{#1}}
+\newenvironment{sumtable}[1]
+  {\par\vspace{5pt}\noindent\footnotesize\setlength{\tabcolsep}{5pt}\renewcommand{\arraystretch}{1.3}%
+   \begin{tabular}{@{}#1@{}}\toprule}
+  {\bottomrule\end{tabular}\par\vspace{5pt}}
+\newcommand{\sumhead}[1]{{\sffamily\bfseries\scriptsize #1}}
 
 %% Key facts at the end of a chapter.
 \newenvironment{keyfacts}
