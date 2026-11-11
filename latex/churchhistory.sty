@@ -19,9 +19,14 @@
   \linespread{1.04}
   \IfFileExists{glyphtounicode.tex}{\input{glyphtounicode}\pdfgentounicode=1 }{}% searchable PDF text
 \else
-  \RequirePackage{fontspec}            % Latin Modern unless TeX Gyre Pagella is installed
-  \IfFontExistsTF{TeX Gyre Pagella}%
-    {\setmainfont{TeX Gyre Pagella}\linespread{1.04}\ch@fontspecfonttrue}{}
+  \RequirePackage{fontspec}
+  %% TeX Gyre Pagella (a Palatino, part of TeX Live and MiKTeX); Latin Modern if it is missing.
+  \IfFontExistsTF{texgyrepagella-regular.otf}%
+    {\defaultfontfeatures[texgyrepagella]{Extension=.otf,UprightFont=*-regular,BoldFont=*-bold,
+        ItalicFont=*-italic,BoldItalicFont=*-bolditalic}%
+     \setmainfont{texgyrepagella}%
+     \ifXeTeX\newfontfamily\ch@spacedfont{texgyrepagella}[LetterSpace=7]\fi
+     \linespread{1.04}\ch@fontspecfonttrue}{}
 \fi
 
 %% ---------------------------------------------------------------------------------------
@@ -50,7 +55,7 @@
 %% Letter-spaced capitals for small labels (XeTeX can only do this with a fontspec font).
 \ifXeTeX
   \ifch@fontspecfont
-    \newcommand*{\ch@spaced}[1]{{\addfontfeature{LetterSpace=7}#1}}
+    \newcommand*{\ch@spaced}[1]{{\ch@spacedfont #1}}
   \else
     \newcommand*{\ch@spaced}[1]{#1}
   \fi

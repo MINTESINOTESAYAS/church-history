@@ -13,15 +13,16 @@ pdflatex main && pdflatex main      # two runs for the page numbers in the conte
 
 `latexmk -pdf main` works as well. On Overleaf, set `latex/main.tex` as the main document.
 
-| Engine   | Status                          | Result                                         |
-|----------|---------------------------------|------------------------------------------------|
-| pdfLaTeX | tested (TeX Live 2022)          | 608 pages, Palatino, no overfull boxes         |
-| XeLaTeX  | tested (TeX Live 2022)          | 581 pages with the Latin Modern fallback font  |
-| LuaLaTeX | supported in the style, untested | —                                              |
+| Engine   | Status                             | Result                                                        |
+|----------|------------------------------------|---------------------------------------------------------------|
+| pdfLaTeX | tested (TeX Live 2022)             | 608 pages, Palatino, no overfull boxes                        |
+| XeLaTeX  | tested (TeX Live 2022)             | TeX Gyre Pagella (about 600 pages) or Latin Modern (581 pages) |
+| LuaLaTeX | same set-up as XeLaTeX, not tested | —                                                             |
 
 Packages used: `geometry`, `microtype`, `fancyhdr`, `array`, `booktabs`, `multicol`,
-`hyperref`, `iftex`, plus `mathpazo` (pdfLaTeX) or `fontspec` (XeLaTeX/LuaLaTeX; TeX Gyre
-Pagella is used when it is installed).
+`hyperref`, `iftex`, plus `mathpazo` (pdfLaTeX) or `fontspec` (XeLaTeX/LuaLaTeX). With
+XeLaTeX and LuaLaTeX the TeX Gyre Pagella fonts (`texgyrepagella-*.otf`, part of TeX Live
+and MiKTeX) are used when they are installed; otherwise the text is set in Latin Modern.
 
 To typeset only part of the book while editing, uncomment the `\includeonly` line in `main.tex`.
 
